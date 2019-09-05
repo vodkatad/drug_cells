@@ -1,0 +1,33 @@
+include: "conf.sk"
+
+def find_pairs(wildcards):
+    # all combos are generated in a single shot with  [x+"_"+y for x in DATASETS for y in DATASETS if y!=x] but since correlations
+    # are commutative we only want one pair (CTRP_FIMM only, not also FIMM_CTRP)
+    result = []
+    for i in range(0, len(DATASETS)):
+        for j in range(i+1, len(DATASETS)): # starting from i+1 produces only once each pair
+            result.append("all_"+DATASETS[i]+"_"+DATASETS[j]+".cell.tsv")
+    return result
+     
+
+rule all_spearman:
+    input: find_pairs
+
+# The first name in AICM filenames is the datasets where AUC are from, the second one only indicates (we think) that it was matched 
+# with respect to cell lines and drugs available in that dataset.
+rule row_col_spearman:
+    input: df1=DATA_DIR+"/{df1}_{df2}_AUC_ori.csv", df2=DATA_DIR+"/{df2}_{df1}_AUC_ori.csv"
+    output: cell_cors="all_{df1}_{df2}.cell.tsv", drug_cors="all_{df1}_{df2}.drug.tsv"
+    shell:
+        """
+            echo {input} > {output.cell_cors}
+            echo {input} > {output.drug_cors}
+        """
+
+
+# rule that selects only significant pvalues (get from the filtering on dip tests pvalues), output will be sign_{df1}_{df2}.{cell|drug}.tsv
+# using a wildcard for {type} that will be cell or drug we can write a single rule that will be then called twice
+
+# rule that plots histogram: here we will have three wildcards: for df, for cell|drug and for sign|all
+
+# rule without code (like all_spearman) that generates all the wanted filenames: pairs of dfs / cell|drug / significance
