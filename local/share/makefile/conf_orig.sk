@@ -13,3 +13,4 @@ PRJ_ROOT=find_prj_root()
 
 DATA_DIR=PRJ_ROOT+"/local/share/data/orig"
 DATASETS=["CTRP","FIMM","GDSC"]
+BIN_DIR=PRJ_ROOT+"/local/bin"

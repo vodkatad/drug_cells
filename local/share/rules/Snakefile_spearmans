@@ -14,18 +14,29 @@ def find_pairs(wildcards):
 rule all_spearman:
     input: find_pairs
 
+
 # The first name in AICM filenames is the datasets where AUC are from, the second one only indicates (we think) that it was matched 
 # with respect to cell lines and drugs available in that dataset.
 rule row_col_spearman:
-    input: df1=DATA_DIR+"/{df1}_{df2}_AUC_ori.csv", df2=DATA_DIR+"/{df2}_{df1}_AUC_ori.csv"
+    input: df1=DATA_DIR+"/{df1}_{df2}_AUC_"+SUFFIX+".csv", df2=DATA_DIR+"/{df2}_{df1}_AUC_"+SUFFIX+".csv"
     output: cell_cors="all_{df1}_{df2}.cell.tsv", drug_cors="all_{df1}_{df2}.drug.tsv"
+    params: tool=BIN_DIR+"/correlations_correction"
     shell:
         """
-            echo {input} > {output.cell_cors}
-            echo {input} > {output.drug_cors}
+            {params.tool} {input.df1} {input.df2} {output.cell_cors} {output.drug_cors}
         """
 
+def op_filter(wildcards):
+    result = []
+    for i in range(0, len(DATASETS)):
+        for j in range(i+1, len(DATASETS)):
+            result.append("sign_"+DATASETS[i]+"_"+DATASETS[j]+".cell.tsv")
+            result.append("sign_"+DATASETS[i]+"_"+DATASETS[j]+".drug.tsv")
+    return result
 
+rule all_filter:
+    input: op_filter 
+  
 # rule that selects only significant pvalues (get inspiration from the filtering on dip tests pvalues), output will be sign_{df1}_{df2}.{cell|drug}.tsv
 # using a wildcard for {type} that will be cell or drug we can write a single rule that will be then called twice
 rule filter:
@@ -33,23 +44,26 @@ rule filter:
     output: "sign_{df1}_{df2}.{type}.tsv"
     shell:
         """
-        TODO
-        """
+            N=$(cat {input} | wc -l); \\
+            cat {input} | bawk -v n=$N '$3*n < 0.05' > {output}
+        """         
+
+
 # rule that plots histogram: here we will have three wildcards: for df, for cell|drug and for sign|all
 rule histo:
-    input: "{filter}_{df1}_{df2}.{type}.tsv"
-    output: "{filter}_{df1}_{df2}.{type}.pdf"
+    input: expand("{filter}_{{df1}}_{{df2}}.{{type}}.tsv", filter=["all","sign"])
+    output: "{df1}_{df2}.{type}.pdf"
+    params: tool=BIN_DIR+"/neg-pos_histo"
     shell:
         """
-        TODO
+            {params.tool} {input[0]} {input[1]} {output}
         """
 
 def find_all_histo(wildcards):
     import re
     unfiltered = find_pairs(wildcards)
-    filtered = [re.sub(r'^all_','sign_',x) for x in unfiltered] 
-    res = unfiltered+filtered
-    return [re.sub(r'.tsv$','.pdf',x) for x in res]
+    filtered = [re.sub(r'^all_','',x) for x in unfiltered] 
+    return [re.sub(r'\.tsv$','.pdf',x) for x in filtered]
 
 # rule without code (like all_spearman) that generates all the wanted filenames: pairs of dfs / cell|drug / significance
 rule all:
